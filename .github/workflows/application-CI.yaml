@@ -1,0 +1,103 @@
+name: application-CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'app/**'
+      - '.github/workflows/application-CI.yaml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'app/**'
+      - '.github/workflows/application-CI.yaml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: application-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE_NAME: simple-node-api
+
+jobs:
+  scanning-and-testing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ./app
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: 'npm'
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Linting
+        run: npm run lint
+
+      - name: Run Tests
+        run: npm test
+
+      - name: Security audit
+        run: npm audit
+
+      - name: SAST Scan (Semgrep)
+        uses: docker://semgrep/semgrep@sha256:67319956da3dcb58baf5b322899c15458e3963e7018a86aeeb5cd224e69cb77a
+        with:
+          args: |
+            scan
+            --config
+            p/default
+            --config
+            p/security-audit
+            --error
+            --metrics=off
+            .
+
+      - name: Trufflehog Secret Scanning
+        uses: trufflesecurity/trufflehog@bcfcf73aaf4759d4dadc2783177c245a02792318 # v3.97.0
+        with:
+          path: ./
+          extra_args: --only-verified --exclude-paths=.github/trufflehog-exclude.txt
+
+      - name: Generate SBOM
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'cyclonedx'
+          output: 'sbom-app.cdx.json'
+          sbom: 'true'
+
+      # - name: Upload SBOM artifact
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: sbom-app
+      #     path: app/sbom-app.cdx.json
+
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: 'fs'
+          skip-dirs: 'node_modules'
+          format: 'table'
+          scan-ref: '.'
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: 'HIGH,CRITICAL'
+          scanners: 'vuln'

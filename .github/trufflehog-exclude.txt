@@ -1,0 +1,2 @@
+app/coverage/.*
+app/package-lock\.json
