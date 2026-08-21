@@ -5,6 +5,10 @@ const httpLogger = require('./httpLogger');
 const logger = require('./logger');
 
 function createApp() {
+  // nosemgrep: javascript.express.security.audit.express-check-csurf-middleware-usage.express-check-csurf-middleware-usage
+  // No CSRF middleware: this API has no cookie-based session auth (no express-session/cookie-parser),
+  // so there's no ambient credential for a cross-site request to ride along on - the CSRF threat model
+  // doesn't apply. Revisit if cookie-based auth is ever added.
   const app = express();
 
   app.use(helmet());
