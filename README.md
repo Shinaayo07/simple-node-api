@@ -1,2 +1,2 @@
 # simple-node-api
-This application is for the pratical assesement interview in Prembly.
+This application is for the pratical assesement interview at Prembly.
