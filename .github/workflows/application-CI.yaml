@@ -60,15 +60,7 @@ jobs:
         uses: docker://semgrep/semgrep@sha256:67319956da3dcb58baf5b322899c15458e3963e7018a86aeeb5cd224e69cb77a
         with:
           entrypoint: semgrep
-          args:
-            - scan
-            - --config
-            - p/default
-            - --config
-            - p/security-audit
-            - --error
-            - --metrics=off
-            - .
+          args: scan --config p/default --config p/security-audit --error --metrics=off .
 
       - name: Trufflehog Secret Scanning
         uses: trufflesecurity/trufflehog@bcfcf73aaf4759d4dadc2783177c245a02792318 # v3.97.0
