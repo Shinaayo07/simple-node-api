@@ -194,3 +194,5 @@ curl -X PATCH http://localhost:3000/api/orders/1/status \
 
 - Data resets on every process restart since storage is in-memory only — this is intentional for a self-contained assessment app, not a production data layer.
 - `NODE_ENV=test` disables OpenTelemetry initialization and silences logging by default, keeping test output clean.
+
+###
