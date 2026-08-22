@@ -21,6 +21,8 @@ ENV NODE_ENV=production \
 
 WORKDIR /app
 
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
+
 # Use a non-root user to run our application
 USER node
 
