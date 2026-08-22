@@ -24,6 +24,7 @@ concurrency:
 
 env:
   IMAGE_NAME: simple-node-api
+  ACR_NAME: premblyRegistry
 
 jobs:
   scanning-and-testing:
@@ -94,3 +95,67 @@ jobs:
           ignore-unfixed: true
           severity: 'HIGH,CRITICAL'
           scanners: 'vuln'
+
+  build-and-scan-image:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: scanning-and-testing
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Build Docker Image
+        id: build-image
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: ./app
+          file: ./app/Dockerfile
+          push: false
+          load: true
+          tags: ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Scan Image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'HIGH,CRITICAL'
+
+      - name: Log in to Azure Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+         registry: ${{ env.ACR_NAME }}.azurecr.io
+         username: ${{ secrets.AZURE_CLIENT_ID }}
+         password: ${{ secrets.AZURE_CLIENT_SECRET }}
+
+      - name: Push Docker Image to ACR
+        id: push-step
+        run: |
+          docker push ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }} | cut -d'@' -f2)
+          echo "IMAGE_DIGEST=$DIGEST" >> $GITHUB_ENV
+
+      #Signing and Pushing Image to ACR
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
+
+      - name: Sign Docker Image
+        env:
+          IMAGE: ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}@${{ env.IMAGE_DIGEST }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        run: |
+         cosign sign --yes \
+          --key "azurekms://${{ vars.KEY_VAULT_NAME }}.vault.azure.net/${{ vars.KEY_NAME }}" \
+          ${IMAGE}
