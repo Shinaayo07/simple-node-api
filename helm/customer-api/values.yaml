@@ -1,24 +1,19 @@
 nameOverride: ""
 fullnameOverride: "customer-api"
-
 namespace:
   create: true
   podSecurityStandard: restricted
-
 image:
   registry: docker.io
   repository: shina371/simple-node-api
-  tag: ""
-  digest: "sha256:REPLACE_WITH_RELEASE_DIGEST"
+  tag: "044d31a"
+  digest: "sha256:de1b6c1dda48bc343a8d769661c87f7188bd659ddfbf033ea462d6d895ad5afc"
   pullPolicy: IfNotPresent
-
 replicaCount: 2
-
 serviceAccount:
   create: true
   name: ""
   automount: false
-
 podSecurityContext:
   runAsNonRoot: true
   runAsUser: 1000
@@ -26,17 +21,14 @@ podSecurityContext:
   fsGroup: 1000
   seccompProfile:
     type: RuntimeDefault
-
 securityContext:
   allowPrivilegeEscalation: false
   readOnlyRootFilesystem: true
   capabilities:
     drop: ["ALL"]
-
 service:
   type: ClusterIP
   port: 3000
-
 resources:
   requests:
     cpu: 100m
@@ -44,26 +36,22 @@ resources:
   limits:
     cpu: 500m
     memory: 256Mi
-
 probes:
   liveness:
     path: /health
   readiness:
     path: /ready
-
 config:
   nodeEnv: production
   logLevel: info
   otelServiceName: customer-api
   otelExporterOtlpEndpoint: "http://tempo.monitoring.svc.cluster.local:4318/v1/traces"
-
 ingress:
   enabled: true
   className: nginx
   clusterIssuer: letsencrypt-prod # placeholder - name of the cluster's ClusterIssuer
   host: customer-api.example.com # placeholder - replace with the real domain
   tlsSecretName: customer-api-tls
-
 autoscaling:
   enabled: true
   minReplicas: 2
@@ -71,24 +59,19 @@ autoscaling:
   targetCPUUtilizationPercentage: 70
   targetMemoryUtilizationPercentage: 80
   scaleDownStabilizationWindowSeconds: 300
-
 podDisruptionBudget:
   minAvailable: 1
-
 resourceQuota:
   requestsCpu: 500m
   requestsMemory: 512Mi
   limitsCpu: "2"
   limitsMemory: 1Gi
   pods: "5"
-
 limitRange:
   defaultCpu: 500m
   defaultMemory: 256Mi
   defaultRequestCpu: 100m
   defaultRequestMemory: 128Mi
-
-
 networkPolicy:
   enabled: true
   ingressNginx:
@@ -101,13 +84,9 @@ networkPolicy:
     namespaceLabel: monitoring
     podLabel: tempo
     port: 4318
-
-
 serviceMonitor:
   enabled: true
   interval: 15s
-
-
 externalSecrets:
   enabled: true
   # azurekv (default, AKS) or fake (local/kind - ESO's own built-in test
