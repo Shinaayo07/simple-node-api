@@ -5,7 +5,12 @@ resource "azurerm_resource_group" "tfstate" {
   location = var.location
 }
 
-resource "azurerm_storage_account" "tfstate" {
+# This account is blob-only - it holds Terraform state and nothing else
+# (see azurerm_storage_container.tfstate below). No azurerm_storage_queue is
+# ever created against it, so there's no queue traffic for queue-service
+# analytics logging to record; enabling it would just be a permanently-empty
+# log stream for a data service this account doesn't use.
+resource "azurerm_storage_account" "tfstate" { # nosemgrep: terraform.azure.security.storage.storage-queue-services-logging
   name                = var.state_storage_account_name
   resource_group_name = azurerm_resource_group.tfstate.name
   location            = azurerm_resource_group.tfstate.location
