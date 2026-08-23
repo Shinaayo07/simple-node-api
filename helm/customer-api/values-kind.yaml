@@ -18,9 +18,8 @@ image:
   # build. pullPolicy is inherited from values.yaml's IfNotPresent: a digest
   # reference is immutable, so there's no "stale cached tag" problem an
   # Always pull would be working around.
-  tag: "latest"
-  digest: ""
-
+  tag: "044d31a"
+  digest: "sha256:de1b6c1dda48bc343a8d769661c87f7188bd659ddfbf033ea462d6d895ad5afc"
 # No cloud Key Vault in kind - ESO's own "fake" provider exercises the same
 # ExternalSecret -> SecretStore -> Secret path without one. See
 # eso-secretstore.yaml/eso-serviceaccount.yaml for the provider branch.
@@ -28,7 +27,6 @@ externalSecrets:
   enabled: true
   provider: fake
   fakeValue: "local-dev-demo-value"
-
 ingress:
   enabled: true
   className: nginx
