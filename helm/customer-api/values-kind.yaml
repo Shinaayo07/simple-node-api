@@ -1,0 +1,43 @@
+# Local/kind overlay - layered on top of values.yaml (`helm install -f
+# values.yaml -f values-kind.yaml`, or ArgoCD's `helm.valueFiles` doing the
+# same thing). Same chart, same templates, same version as what deploys to
+# AKS - only the environment-specific inputs below differ. That's the whole
+# point: one Helm package, reproducible on both clusters.
+#
+# Anything not overridden here (replicaCount, resources, networkPolicy,
+# resourceQuota, serviceMonitor, ...) is inherited from values.yaml as-is -
+# kind's Calico CNI, ingress-nginx namespace/pod labels, and CoreDNS labels
+# all match those defaults already, so there was nothing to change there.
+
+image:
+  registry: docker.io
+  repository: shina371/simple-node-api
+  # Digest-pinned, same as values.yaml (AKS) - update-gitops-manifests in
+  # .github/workflows/application-CI.yaml bumps both files' image.digest
+  # (and image.tag, for a human-readable git diff) after every push-to-main
+  # build. pullPolicy is inherited from values.yaml's IfNotPresent: a digest
+  # reference is immutable, so there's no "stale cached tag" problem an
+  # Always pull would be working around.
+  tag: "latest"
+  digest: ""
+
+# No cloud Key Vault in kind - ESO's own "fake" provider exercises the same
+# ExternalSecret -> SecretStore -> Secret path without one. See
+# eso-secretstore.yaml/eso-serviceaccount.yaml for the provider branch.
+externalSecrets:
+  enabled: true
+  provider: fake
+  fakeValue: "local-dev-demo-value"
+
+ingress:
+  enabled: true
+  className: nginx
+  # Self-signed, created by terraform/kind (see cert-manager.tf) - there's
+  # no public DNS/ACME challenge to complete for a cluster that only exists
+  # on this machine.
+  clusterIssuer: selfsigned-cluster-issuer
+  # nip.io resolves to the IP embedded in the hostname (127.0.0.1 here) via
+  # public DNS, so this reaches kind's ingress-nginx (hostPort-mapped to
+  # localhost:443 by terraform/kind) with zero /etc/hosts editing.
+  host: customer-api.127.0.0.1.nip.io
+  tlsSecretName: customer-api-tls

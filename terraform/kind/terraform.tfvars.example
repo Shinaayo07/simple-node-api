@@ -1,0 +1,8 @@
+# Copy to terraform.tfvars and adjust if needed - every value here already
+# has a working default, so an empty terraform.tfvars (or none at all) is
+# a valid way to run this module too.
+
+# cluster_name    = "simple-node-api-kind"
+# worker_count    = 2      # set to 0 for a lighter single-node cluster
+# http_host_port  = 80     # change if something local already owns :80
+# https_host_port = 443    # change if something local already owns :443

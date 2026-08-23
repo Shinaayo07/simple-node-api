@@ -1,0 +1,95 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "customer-api.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "customer-api.fullname" . }}-allow-ingress-from-nginx
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "customer-api.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "customer-api.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.ingressNginx.namespaceLabel }}
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ .Values.networkPolicy.ingressNginx.podLabel }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.port }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "customer-api.fullname" . }}-allow-egress-dns
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "customer-api.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "customer-api.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.dns.namespaceLabel }}
+          podSelector:
+            matchLabels:
+              k8s-app: {{ .Values.networkPolicy.dns.podLabel }}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "customer-api.fullname" . }}-allow-egress-to-tempo
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "customer-api.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "customer-api.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Egress
+  egress:
+    # Placeholder values (networkPolicy.tempo.*): matches the labels the
+    # eventual monitoring Helm release gives its Tempo pod/namespace. Until
+    # that chart is deployed with matching labels, trace export fails
+    # closed (blocked), not open.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.tempo.namespaceLabel }}
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ .Values.networkPolicy.tempo.podLabel }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.networkPolicy.tempo.port }}
+{{- end }}

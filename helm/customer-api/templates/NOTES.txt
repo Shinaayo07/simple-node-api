@@ -1,0 +1,24 @@
+customer-api has been deployed to namespace "{{ .Release.Namespace }}".
+
+Check rollout status:
+  kubectl rollout status deployment/{{ include "customer-api.fullname" . }} -n {{ .Release.Namespace }}
+
+{{- if .Values.ingress.enabled }}
+Once DNS points at your ingress controller and cert-manager has issued the
+certificate, the app will be reachable at:
+  https://{{ .Values.ingress.host }}
+{{- else }}
+Ingress is disabled - reach the app with:
+  kubectl port-forward svc/{{ include "customer-api.fullname" . }} -n {{ .Release.Namespace }} 3000:{{ .Values.service.port }}
+{{- end }}
+
+{{- if .Values.serviceMonitor.enabled }}
+ServiceMonitor is enabled - this will not sync until the Prometheus Operator
+CRDs exist in this cluster (installed by the separate monitoring chart).
+{{- end }}
+{{- if .Values.externalSecrets.enabled }}
+External Secrets demo resources are enabled - these will not sync until the
+External Secrets Operator CRDs exist in this cluster, and the ExternalSecret
+will show SecretSyncedError until "{{ .Values.externalSecrets.remoteKey }}"
+actually exists in the referenced Key Vault.
+{{- end }}

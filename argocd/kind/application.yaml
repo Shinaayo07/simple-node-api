@@ -1,0 +1,46 @@
+# Kind-only mirror of ../application.yaml. Same chart, same repo, same
+# path - the only difference from the AKS Application is the extra
+# valueFiles entry layering values-kind.yaml over values.yaml (local image
+# tag, fake ESO provider, self-signed ingress). One Helm package, two sets
+# of environment inputs.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: customer-api
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: simple-node-api
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io/foreground
+spec:
+  project: customer-api
+
+  source:
+    repoURL: https://github.com/Shinaayo07/simple-node-api.git
+    targetRevision: main
+    path: helm/customer-api
+    helm:
+      releaseName: customer-api
+      valueFiles:
+        - values.yaml
+        - values-kind.yaml
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: customer-api
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - SkipDryRunOnMissingResource=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+
+  revisionHistoryLimit: 5

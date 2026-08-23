@@ -1,0 +1,122 @@
+# SingleBinary deployment mode, plain filesystem storage - no minio, no
+# distributed read/write/backend/ingester/compactor/etc. components, no
+# bundled memcached caches. Verified via `helm template`: renders to exactly
+# one StatefulSet (1 replica), RBAC, and 3 Services. That's the whole
+# footprint - this is about as light as Loki gets while still being real
+# Loki (not promtail-to-nowhere).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: loki
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: monitoring-stack
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io/foreground
+spec:
+  project: monitoring
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: loki
+    targetRevision: "7.3.0"
+    helm:
+      values: |
+        deploymentMode: SingleBinary
+
+        loki:
+          auth_enabled: false
+          commonConfig:
+            replication_factor: 1
+          storage:
+            type: filesystem
+          schemaConfig:
+            configs:
+              - from: "2024-01-01"
+                store: tsdb
+                object_store: filesystem
+                schema: v13
+                index:
+                  prefix: index_
+                  period: 24h
+
+        singleBinary:
+          replicas: 1
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          persistence:
+            enabled: true
+            size: 10Gi
+
+        # No object storage backend running in-cluster - filesystem storage
+        # above needs it disabled explicitly, else the chart defaults to
+        # deploying it as one more component to run and maintain.
+        minio:
+          enabled: false
+
+        # Bundled memcached caches for chunks/query-result caching - real
+        # perf win at scale, unnecessary weight (2 more StatefulSets) for
+        # one small app's log volume.
+        chunksCache:
+          enabled: false
+        resultsCache:
+          enabled: false
+
+        # Zero out every deployment-mode component that isn't SingleBinary -
+        # otherwise some render with default replica counts regardless of
+        # deploymentMode.
+        backend:
+          replicas: 0
+        read:
+          replicas: 0
+        write:
+          replicas: 0
+        ingester:
+          replicas: 0
+        querier:
+          replicas: 0
+        queryFrontend:
+          replicas: 0
+        queryScheduler:
+          replicas: 0
+        distributor:
+          replicas: 0
+        compactor:
+          replicas: 0
+        indexGateway:
+          replicas: 0
+        bloomCompactor:
+          replicas: 0
+        bloomGateway:
+          replicas: 0
+        bloomPlanner:
+          replicas: 0
+        bloomBuilder:
+          replicas: 0
+
+        gateway:
+          enabled: false
+        test:
+          enabled: false
+        lokiCanary:
+          enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+  revisionHistoryLimit: 5

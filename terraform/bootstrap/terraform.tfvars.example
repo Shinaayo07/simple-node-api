@@ -1,0 +1,10 @@
+# Copy to terraform.tfvars and fill in.
+
+location                    = "westus2"
+state_resource_group_name   = "rg-simple-node-api-tfstate"
+# Must be globally unique across all of Azure, 3-24 lowercase letters/numbers.
+state_storage_account_name  = "tfstatesimplenodeapi01"
+state_container_name        = "tfstate"
+
+# Leave empty for initial setup, then lock down to your real IP(s):
+allowed_ip_ranges = []

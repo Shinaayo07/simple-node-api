@@ -1,0 +1,13 @@
+# Copy to backend.hcl (gitignored) and fill in with bootstrap's
+# `backend_config_snippet` output, then:
+#   terraform init -backend-config=backend.hcl
+#
+# Not committed as real values because a storage account name is
+# effectively an environment-specific detail, not something this config
+# should hardcode - same reasoning as terraform.tfvars.example.
+
+resource_group_name  = ""
+storage_account_name = ""
+container_name       = "tfstate"
+key                  = "cluster.tfstate"
+use_azuread_auth     = true

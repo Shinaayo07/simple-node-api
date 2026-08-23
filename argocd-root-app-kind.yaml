@@ -1,0 +1,52 @@
+# The one manifest you apply by hand for the LOCAL kind cluster - mirrors
+# argocd-root-app.yaml's role for AKS exactly, just scoped to argocd/kind/
+# instead of argocd/ so the two ArgoCD instances (this one running inside
+# kind, the other on AKS) never see each other's Application/AppProject
+# objects even though both read the same git repo/branch.
+#
+# Deliberately does NOT also pick up the monitoring stack - recurse: false
+# only reads files directly under argocd/kind/ (customer-api's
+# application.yaml/appproject.yaml). Apply argocd/monitoring-apps.yaml
+# alongside this one if you want the observability stack too - see
+# README.md for the exact command. Keeping it a separate, optional
+# `-f` means a resource-constrained machine can run the app without also
+# paying for Prometheus/Loki/Tempo/Grafana/Alloy.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root-kind
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: gitops-bootstrap
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io/foreground
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/Shinaayo07/simple-node-api.git
+    targetRevision: main
+    path: argocd/kind
+    directory:
+      recurse: false
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+
+  syncPolicy:
+    automated:
+      selfHeal: true
+      # Same reasoning as argocd-root-app.yaml: no prune here, so an
+      # accidentally-deleted file under argocd/kind/ surfaces as
+      # out-of-sync instead of cascading a deletion automatically.
+    syncOptions:
+      - CreateNamespace=false
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+
+  revisionHistoryLimit: 5

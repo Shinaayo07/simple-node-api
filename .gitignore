@@ -1,0 +1,21 @@
+k8s/
+
+# Terraform - state/plan output and anything with real (non-.example) values.
+# .terraform.lock.hcl is deliberately NOT ignored - it pins provider
+# versions and should be committed.
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+terraform/**/terraform.tfvars
+terraform/**/backend.hcl
+
+# terraform/kind writes a live cluster-admin kubeconfig here on every apply -
+# credentials, never committed, same reasoning as *.tfstate above.
+terraform/kind/.kubeconfig

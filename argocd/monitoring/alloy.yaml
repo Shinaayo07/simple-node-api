@@ -1,0 +1,93 @@
+# Kubernetes-native log collection: loki.source.kubernetes reads pod logs
+# through the Kubernetes API server (the same mechanism `kubectl logs`
+# uses), not by mounting /var/log/pods from each node. That means this
+# doesn't need to be a DaemonSet - a single Deployment replica can discover
+# and tail every pod in the cluster centrally. Verified via `helm template`:
+# renders to one Deployment (1 replica), one ConfigMap, RBAC, Service,
+# ServiceAccount - 6 objects, 1 running pod. That's the whole footprint.
+#
+# This differs from the docker-compose setup (Alloy there used
+# discovery.docker + loki.source.docker against the Docker socket, because
+# that's what's available outside Kubernetes) - different discovery
+# mechanism, same end result: every pod's stdout/stderr, including
+# customer-api's, ends up in Loki.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: alloy
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: monitoring-stack
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io/foreground
+spec:
+  project: monitoring
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: alloy
+    targetRevision: "1.11.1"
+    helm:
+      values: |
+        controller:
+          type: deployment
+          replicas: 1
+
+        alloy:
+          configMap:
+            create: true
+            content: |
+              discovery.kubernetes "pods" {
+                role = "pod"
+              }
+
+              discovery.relabel "pods" {
+                targets = discovery.kubernetes.pods.targets
+
+                rule {
+                  source_labels = ["__meta_kubernetes_namespace"]
+                  target_label  = "namespace"
+                }
+                rule {
+                  source_labels = ["__meta_kubernetes_pod_name"]
+                  target_label  = "pod"
+                }
+                rule {
+                  source_labels = ["__meta_kubernetes_pod_container_name"]
+                  target_label  = "container"
+                }
+              }
+
+              loki.source.kubernetes "pods" {
+                targets    = discovery.relabel.pods.output
+                forward_to = [loki.write.default.receiver]
+              }
+
+              loki.write "default" {
+                endpoint {
+                  url = "http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push"
+                }
+              }
+
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 300m
+            memory: 256Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+  revisionHistoryLimit: 5

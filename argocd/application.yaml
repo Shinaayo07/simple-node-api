@@ -1,0 +1,40 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: customer-api
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: simple-node-api
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io/foreground
+spec:
+  project: customer-api
+
+  source:
+    repoURL: https://github.com/Shinaayo07/simple-node-api.git
+    targetRevision: main
+    path: helm/customer-api
+    helm:
+      # No valueFiles override yet - reads helm/customer-api/values.yaml's
+      # defaults as-is. Once per-environment overlays exist (e.g.
+      # values-production.yaml), list them here; ArgoCD merges them over
+      # values.yaml in order, same as passing multiple -f flags to helm.
+      releaseName: customer-api
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: customer-api
+  syncPolicy:
+    automated:
+      prune: true 
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false 
+      - SkipDryRunOnMissingResource=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+
+  revisionHistoryLimit: 5

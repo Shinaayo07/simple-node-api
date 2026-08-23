@@ -1,0 +1,23 @@
+{{- if .Values.serviceMonitor.enabled }}
+# Requires the Prometheus Operator CRDs (installed by the monitoring Helm
+# release, e.g. kube-prometheus-stack) to already exist in the cluster.
+# If applied before that chart is deployed, ArgoCD will fail to sync this one
+# resource - see the SkipDryRunOnMissingResource syncOption in
+# application.yaml, which lets the rest of the app sync anyway. Or just set
+# serviceMonitor.enabled: false until that chart lands.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "customer-api.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "customer-api.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "customer-api.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: {{ .Values.serviceMonitor.interval }}
+{{- end }}

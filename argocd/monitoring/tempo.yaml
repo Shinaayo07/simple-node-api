@@ -1,0 +1,64 @@
+# Single-binary Tempo, local filesystem trace storage - matches the same
+# choice made for the docker-compose stack. Renders to exactly one
+# StatefulSet, one ConfigMap, one Service, one ServiceAccount - nothing else.
+#
+# Note: the `grafana/tempo` (single-binary) chart carries an upstream
+# `deprecated: true` flag - but so does `grafana/tempo-distributed`
+# (confirmed via `helm show chart` on both), and the distributed chart
+# renders to 6 separate workloads (4 Deployments + 2 StatefulSets) even with
+# minio and the metrics-generator disabled. Since deprecation status is a
+# wash between the two, weight isn't, and "lightweight" was the explicit
+# ask - single-binary wins. Worth revisiting if Grafana ever stops
+# publishing patches for it; grafana/lgtm-distributed is the newer umbrella
+# chart to look at if so.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tempo
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: monitoring-stack
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io/foreground
+spec:
+  project: monitoring
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: tempo
+    targetRevision: "1.24.4"
+    helm:
+      values: |
+        tempo:
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+        persistence:
+          enabled: true
+          size: 10Gi
+
+        # Prometheus Operator CRD - would fail to sync until prometheus.yaml
+        # is deployed and its CRDs bootstrapped; not worth the coupling for
+        # one component's own self-monitoring.
+        serviceMonitor:
+          enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+  revisionHistoryLimit: 5

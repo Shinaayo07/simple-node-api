@@ -1,0 +1,22 @@
+# Copy to terraform.tfvars and fill in. Not secrets (see the earlier
+# discussion on GUIDs/identifiers vs. real credentials) - kept as an
+# .example file mainly so this config never accidentally applies with a
+# wide-open authorized_ip_ranges by default.
+
+location             = "westus2"
+resource_group_name  = "rg-simple-node-api-aks"
+cluster_name         = "aks-simple-node-api"
+
+# Your public IP as a /32 - check https://ifconfig.me
+authorized_ip_ranges = ["203.0.113.4/32"]
+
+node_vm_size   = "Standard_D2as_v5"
+node_min_count = 2
+node_max_count = 3
+sku_tier       = "Free"
+
+tags = {
+  project     = "simple-node-api"
+  managed_by  = "terraform"
+  environment = "dev"
+}

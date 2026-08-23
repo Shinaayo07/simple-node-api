@@ -1,0 +1,94 @@
+# Query/visualization layer over the three backends above. Datasource URLs
+# below are the actual in-cluster Service DNS names/ports confirmed by
+# `helm template` against the exact chart versions pinned here and in
+# prometheus.yaml/loki.yaml/tempo.yaml - not guessed:
+#   prometheus-prometheus.monitoring.svc.cluster.local:9090
+#   loki.monitoring.svc.cluster.local:3100
+#   tempo.monitoring.svc.cluster.local:3200
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: grafana
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: monitoring-stack
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io/foreground
+spec:
+  project: monitoring
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: grafana
+    targetRevision: "10.5.15"
+    helm:
+      values: |
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 300m
+            memory: 256Mi
+
+        persistence:
+          enabled: true
+          size: 2Gi
+
+        # Anonymous admin access, same call made for the docker-compose
+        # stack - fine for a demo/interview cluster with nothing sensitive
+        # behind it; swap for real auth (OIDC/SSO) before this is anything
+        # more than that.
+        grafana.ini:
+          auth.anonymous:
+            enabled: true
+            org_role: Admin
+
+        datasources:
+          datasources.yaml:
+            apiVersion: 1
+            datasources:
+              - name: Prometheus
+                type: prometheus
+                uid: prometheus
+                access: proxy
+                url: http://prometheus-prometheus.monitoring.svc.cluster.local:9090
+                isDefault: true
+                jsonData:
+                  exemplarTraceIdDestinations:
+                    - name: traceID
+                      datasourceUid: tempo
+                      urlDisplayLabel: View Trace
+
+              - name: Loki
+                type: loki
+                uid: loki
+                access: proxy
+                url: http://loki.monitoring.svc.cluster.local:3100
+
+              - name: Tempo
+                type: tempo
+                uid: tempo
+                access: proxy
+                url: http://tempo.monitoring.svc.cluster.local:3200
+                jsonData:
+                  tracesToLogsV2:
+                    datasourceUid: loki
+                    filterByTraceID: true
+                  serviceMap:
+                    datasourceUid: prometheus
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+  revisionHistoryLimit: 5

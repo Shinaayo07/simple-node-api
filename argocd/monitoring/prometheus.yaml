@@ -1,0 +1,88 @@
+# Bootstrap step, once, outside GitOps (deliberately - see appproject.yaml):
+#   helm install prometheus-operator-crds prometheus-community/prometheus-operator-crds
+# This Application skips CRDs entirely (helm.skipCrds) so it can never prune
+# them.
+#
+# Everything EXCEPT what's needed to run one Prometheus instance is disabled:
+# no bundled Grafana (we run our own, see grafana.yaml), no Alertmanager, no
+# node-exporter/kube-state-metrics (cluster-wide infra metrics, not needed to
+# cover customer-api), no default alerting rules. What's left: the Operator
+# deployment + one Prometheus pod. Verified via `helm template` - renders to
+# a Deployment (operator), a Prometheus CR (1 replica), RBAC, and the
+# operator's own webhook config - nothing else.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prometheus
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: monitoring-stack
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io/foreground
+spec:
+  project: monitoring
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: "88.5.3"
+    helm:
+      skipCrds: true
+      values: |
+        fullnameOverride: "prometheus"
+
+        nodeExporter:
+          enabled: false
+        kubeStateMetrics:
+          enabled: false
+        alertmanager:
+          enabled: false
+        grafana:
+          enabled: false
+        defaultRules:
+          create: false
+
+        prometheusOperator:
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+
+        prometheus:
+          prometheusSpec:
+            replicas: 1
+            retention: 7d
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+            # nil-selector-uses-helm-values: false + no explicit selector set
+            # below means "match ServiceMonitors/PodMonitors in every
+            # namespace, no label filter" - so customer-api's ServiceMonitor
+            # (in a different namespace, with no special label) gets picked
+            # up automatically, with nothing further to wire on either side.
+            serviceMonitorSelectorNilUsesHelmValues: false
+            podMonitorSelectorNilUsesHelmValues: false
+            serviceMonitorNamespaceSelector: {}
+            podMonitorNamespaceSelector: {}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+  revisionHistoryLimit: 5

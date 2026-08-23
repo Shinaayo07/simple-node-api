@@ -1,0 +1,73 @@
+# Separate AppProject from customer-api's - this owns cluster infra
+# (metrics/logs/traces backends), not application workloads, and its
+# Applications legitimately need cluster-scoped resource kinds the app
+# project deliberately doesn't (see customer-api's appproject.yaml comment).
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: monitoring
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: monitoring-stack
+spec:
+  description: Lightweight in-cluster metrics/logs/traces stack (Prometheus, Loki, Tempo, Alloy, Grafana)
+
+  sourceRepos:
+    - https://github.com/Shinaayo07/simple-node-api.git
+    - https://prometheus-community.github.io/helm-charts
+    - https://grafana.github.io/helm-charts
+
+  destinations:
+    - namespace: monitoring
+      server: https://kubernetes.default.svc
+
+  # Wider than customer-api's whitelist (which only needed a handful of
+  # kinds because the app itself needs zero K8s API access). This project
+  # manages the actual observability infrastructure - Prometheus Operator,
+  # Alloy's Kubernetes-wide log discovery, etc. - and those genuinely need
+  # a broad set of namespaced kinds (Deployments, StatefulSets, RBAC,
+  # webhook config, the CRD *instances* like Prometheus/ServiceMonitor) to
+  # function. Confirmed against what `helm template` actually renders for
+  # each chart below - not a guess.
+  namespaceResourceWhitelist:
+    - group: ""
+      kind: ConfigMap
+    - group: ""
+      kind: Secret
+    - group: ""
+      kind: Service
+    - group: ""
+      kind: ServiceAccount
+    - group: ""
+      kind: PersistentVolumeClaim
+    - group: apps
+      kind: Deployment
+    - group: apps
+      kind: StatefulSet
+    - group: batch
+      kind: Job
+    - group: rbac.authorization.k8s.io
+      kind: Role
+    - group: rbac.authorization.k8s.io
+      kind: RoleBinding
+    - group: monitoring.coreos.com
+      kind: "*" # Prometheus, ServiceMonitor, PrometheusRule, etc. CRD instances
+
+  # Prometheus Operator's CRDs (the CustomResourceDefinition objects
+  # themselves, not instances of them - those are namespaced, above) are
+  # deliberately NOT managed by any Application here - see prometheus.yaml's
+  # helm.skipCrds and the bootstrap note there. Installing them once,
+  # outside GitOps, means an accidental `argocd app delete` on the
+  # prometheus Application can never prune a CRD out from under every
+  # ServiceMonitor cluster-wide (including customer-api's).
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
