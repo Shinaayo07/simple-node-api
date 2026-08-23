@@ -25,7 +25,7 @@ variable "worker_count" {
     everything still schedules and runs, PDB/spread just have nothing to do.
   EOT
   type        = number
-  default     = 2
+  default     = 1
 }
 
 variable "http_host_port" {

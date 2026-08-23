@@ -5,9 +5,15 @@
 # allow-egress-dns, allow-egress-to-tempo) would silently do nothing on
 # top of it. Calico goes in instead, in networking.tf, right after this.
 resource "kind_cluster" "this" {
-  name            = var.cluster_name
-  node_image      = var.node_image
-  wait_for_ready  = true
+  name       = var.cluster_name
+  node_image = var.node_image
+  # false, not true: disable_default_cni below means nodes have no pod
+  # network at all until networking.tf's Calico install runs afterward, so
+  # they can never report Ready during cluster creation itself - waiting
+  # here would just block forever (or until some provider-internal
+  # timeout). Actual readiness is handled downstream by
+  # time_sleep.wait_for_calico once Calico is actually in place.
+  wait_for_ready  = false
   kubeconfig_path = local.kubeconfig_path
 
   kind_config {

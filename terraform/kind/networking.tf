@@ -11,7 +11,7 @@ data "http" "calico_manifest" {
 }
 
 data "kubectl_file_documents" "calico" {
-  content = data.http.calico_manifest.body
+  content = data.http.calico_manifest.response_body
 }
 
 resource "kubectl_manifest" "calico" {

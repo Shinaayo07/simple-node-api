@@ -13,6 +13,11 @@ resource "helm_release" "cert_manager" {
   namespace        = "cert-manager"
   create_namespace = true
   wait             = true
+  # Default (300s) isn't enough on a slow connection pulling 3 images
+  # (controller/webhook/cainjector) for the first time - cert-manager has
+  # already been observed converging to fully Running only for Helm's own
+  # wait to have given up moments earlier and marked the release failed.
+  timeout = 900
 
   values = [
     yamlencode({

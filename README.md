@@ -47,10 +47,14 @@ cert-manager + a local self-signed ClusterIssuer, External Secrets Operator,
 the Prometheus Operator CRDs, and ArgoCD itself. It does **not** deploy the
 application - that's the next step.
 
+Docker must be running before this - `kind` creates the cluster's nodes as
+Docker containers, so `terraform apply` fails immediately (erroring on the
+Docker socket) if the Docker Engine/Docker Desktop isn't up yet.
+
 ```bash
 cd terraform/kind
 terraform init
-terraform apply
+terraform apply -auto-approve
 ```
 
 This takes a few minutes (pulling several Helm charts). When it finishes, the
@@ -131,7 +135,7 @@ one click apart from each other.
 
 ```bash
 cd terraform/kind
-terraform destroy
+terraform destroy -auto-approve
 ```
 
 This deletes the kind cluster (and everything in it) along with the local

@@ -13,6 +13,7 @@ resource "helm_release" "prometheus_operator_crds" {
   version          = "18.0.1"
   namespace        = "monitoring"
   create_namespace = true
+  timeout          = 900
 
   depends_on = [time_sleep.wait_for_calico]
 }

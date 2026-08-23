@@ -8,6 +8,7 @@ resource "helm_release" "metrics_server" {
   version          = "3.12.2"
   namespace        = "kube-system"
   create_namespace = false
+  timeout          = 900
 
   values = [
     yamlencode({
@@ -35,6 +36,7 @@ resource "helm_release" "ingress_nginx" {
   version          = "4.11.3"
   namespace        = "ingress-nginx"
   create_namespace = true
+  timeout          = 900
 
   values = [
     yamlencode({
@@ -45,6 +47,14 @@ resource "helm_release" "ingress_nginx" {
         terminationGracePeriodSeconds = 0
         service = {
           type = "NodePort"
+        }
+        # publishService and publish-status-address (extraArgs, below) are
+        # mutually exclusive - the controller fatals on startup if both are
+        # set. publishService is for reading a cloud LoadBalancer Service's
+        # address, which doesn't exist here (NodePort, no cloud LB); this
+        # cluster reports its own status address directly instead.
+        publishService = {
+          enabled = false
         }
         nodeSelector = {
           "ingress-ready" = "true"
