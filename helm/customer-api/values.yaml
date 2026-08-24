@@ -84,6 +84,9 @@ networkPolicy:
     namespaceLabel: monitoring
     podLabel: tempo
     port: 4318
+  prometheus:
+    namespaceLabel: monitoring
+    podLabel: prometheus
 serviceMonitor:
   enabled: true
   interval: 15s
