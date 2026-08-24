@@ -31,9 +31,6 @@ spec:
               {{- include "customer-api.selectorLabels" . | nindent 14 }}
       containers:
         - name: {{ .Chart.Name }}
-          # Pinned by digest, not a mutable tag, matching the cosign-signed
-          # artifact the CI pipeline pushes. The GitOps pipeline updates
-          # image.digest (not a human editing tags by hand) after each release.
           {{- if .Values.image.digest }}
           image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}@{{ .Values.image.digest }}"
           {{- else }}
@@ -48,10 +45,6 @@ spec:
             - configMapRef:
                 name: {{ include "customer-api.fullname" . }}-config
             {{- if .Values.externalSecrets.enabled }}
-            # Materialized by eso-externalsecret.yaml. optional: true so the
-            # pod still starts even when the Key Vault entry behind it
-            # doesn't exist yet (see that file's comment) - a missing demo
-            # secret shouldn't crash-loop the whole deployment.
             - secretRef:
                 name: {{ include "customer-api.fullname" . }}-secrets
                 optional: true
@@ -80,8 +73,6 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
-            # Root filesystem is read-only; Node needs somewhere writable for
-            # any incidental temp-file use (e.g. os.tmpdir()).
             - name: tmp
               mountPath: /tmp
       volumes:

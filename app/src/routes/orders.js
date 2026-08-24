@@ -7,8 +7,6 @@ const tracer = trace.getTracer('customer-api.orders');
 
 const VALID_STATUSES = ['pending', 'paid', 'shipped', 'cancelled'];
 
-// Only these transitions are allowed, to demonstrate real order-lifecycle rules
-// rather than letting any status jump to any other status.
 const ALLOWED_TRANSITIONS = {
   pending: ['paid', 'cancelled'],
   paid: ['shipped', 'cancelled'],
@@ -17,11 +15,6 @@ const ALLOWED_TRANSITIONS = {
 };
 
 function computeTotal(items) {
-  // Manual span: the auto-instrumentation only sees "an HTTP request came in
-  // and a response went out" - it has no idea this specific calculation
-  // happened inside it. Wrapping it explicitly means Tempo shows
-  // "compute_order_total" as its own named, timed step in the trace,
-  // separate from validation and the store writes around it.
   return tracer.startActiveSpan('compute_order_total', (span) => {
     try {
       const total = items.reduce((sum, item) => {
@@ -71,7 +64,6 @@ function validateOrderPayload(body) {
   });
 }
 
-// GET /api/orders?status=pending&customerId=1
 router.get('/', (req, res) => {
   const { status, customerId } = req.query;
   let results = store.orders.all();
@@ -95,7 +87,6 @@ router.get('/:id', (req, res) => {
   res.json(order);
 });
 
-// POST /api/orders - creates an order referencing existing customers/products
 router.post('/', (req, res) => {
   const body = req.body || {};
   const errors = validateOrderPayload(body);
@@ -113,8 +104,6 @@ router.post('/', (req, res) => {
   res.status(201).json(order);
 });
 
-// PATCH /api/orders/:id/status - the realistic "update" operation for an order:
-// move it through its lifecycle rather than letting arbitrary fields be edited.
 router.patch('/:id/status', (req, res) => {
   const order = store.orders.get(req.params.id);
   if (!order) return res.status(404).json({ error: 'Order not found' });

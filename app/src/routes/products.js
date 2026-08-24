@@ -21,7 +21,6 @@ function isValidProductPayload(body, { partial = false } = {}) {
   return errors;
 }
 
-// GET /api/products?search=widget&minPrice=5&maxPrice=20
 router.get('/', (req, res) => {
   const { search, minPrice, maxPrice } = req.query;
   let results = store.products.all();
@@ -67,7 +66,6 @@ router.post('/', (req, res) => {
   res.status(201).json(product);
 });
 
-// PUT = full replace, requires all required fields
 router.put('/:id', (req, res) => {
   const body = req.body || {};
   const errors = isValidProductPayload(body);
@@ -82,7 +80,6 @@ router.put('/:id', (req, res) => {
   res.json(updated);
 });
 
-// PATCH = partial update, only validates fields that are present
 router.patch('/:id', (req, res) => {
   const body = req.body || {};
   const errors = isValidProductPayload(body, { partial: true });

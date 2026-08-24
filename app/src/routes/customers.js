@@ -20,7 +20,6 @@ function isValidCustomerPayload(body, { partial = false } = {}) {
   return errors;
 }
 
-// GET /api/customers?search=ada
 router.get('/', (req, res) => {
   const { search } = req.query;
   let results = store.customers.all();
@@ -46,7 +45,6 @@ router.post('/', (req, res) => {
   const errors = isValidCustomerPayload(body);
   if (errors.length) return res.status(400).json({ errors });
 
-  // Prevent duplicate emails - a realistic constraint a real DB would enforce
   const emailExists = store.customers.all().some((c) => c.email === body.email);
   if (emailExists) return res.status(409).json({ error: 'Email already in use' });
 

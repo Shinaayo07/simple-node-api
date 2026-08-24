@@ -12,13 +12,9 @@ spec:
 
   source:
     repoURL: https://github.com/Shinaayo07/simple-node-api.git
-    targetRevision: main
+    targetRevision: k8s-release
     path: helm/customer-api
     helm:
-      # No valueFiles override yet - reads helm/customer-api/values.yaml's
-      # defaults as-is. Once per-environment overlays exist (e.g.
-      # values-production.yaml), list them here; ArgoCD merges them over
-      # values.yaml in order, same as passing multiple -f flags to helm.
       releaseName: customer-api
   destination:
     server: https://kubernetes.default.svc

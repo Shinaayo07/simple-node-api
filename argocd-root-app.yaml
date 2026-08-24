@@ -1,18 +1,3 @@
-# The one manifest you apply by hand, ever: `kubectl apply -f argocd-root-app.yaml`.
-# Everything else under argocd/ gets created, updated, and removed
-# automatically from then on, purely by committing to this repo. Lives
-# OUTSIDE argocd/ deliberately: if it sat inside the directory it watches,
-# it would need to exclude itself to avoid trying to manage its own resource.
-#
-# recurse is deliberately FALSE, not true: this only picks up files
-# directly under argocd/ (customer-api's application.yaml/appproject.yaml,
-# and monitoring-apps.yaml) - it does NOT descend into argocd/monitoring/
-# itself. That subtree is delegated entirely to monitoring-apps.yaml's own
-# Application, which recurses into it separately. If this root also
-# recursed into monitoring/, two different Applications would both be
-# trying to own the same 6 child resources - ArgoCD would see that as
-# permanent drift, with each one fighting to "correct" what the other just
-# applied.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -23,10 +8,6 @@ metadata:
   finalizers:
     - resources-finalizer.argocd.argoproj.io/foreground
 spec:
-  # Not customer-api's or monitoring's AppProject - this one creates
-  # Application/AppProject objects themselves (in the argocd namespace),
-  # which is broader than either of those two are scoped to allow. Uses
-  # ArgoCD's built-in "default" project, same as most app-of-apps roots.
   project: default
 
   source:
@@ -43,17 +24,6 @@ spec:
   syncPolicy:
     automated:
       selfHeal: true
-      # Deliberately NOT prune: true, unlike every child Application. This
-      # is the one place a missing manifest matters at a different scale:
-      # if prometheus.yaml were accidentally deleted from git, this
-      # Application would notice it's out of sync but leave the prometheus
-      # Application (and everything it owns - the running Prometheus pod,
-      # its PVC, etc.) alone rather than auto-deleting it. A human has to
-      # run `argocd app prune root` (or click prune in the UI) to actually
-      # cascade a deletion from here - the leaf Applications below still
-      # prune their own resources automatically, since deleting a
-      # ConfigMap is a much smaller blast radius than deleting an
-      # Application.
     syncOptions:
       - CreateNamespace=false
     retry:

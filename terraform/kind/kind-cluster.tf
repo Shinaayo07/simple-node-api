@@ -1,18 +1,6 @@
-# One control-plane + var.worker_count workers. disable_default_cni is the
-# load-bearing setting here: kind normally installs kindnet, which routes
-# pod traffic but enforces zero NetworkPolicy - every NetworkPolicy the
-# customer-api chart ships (default-deny-all, allow-ingress-from-nginx,
-# allow-egress-dns, allow-egress-to-tempo) would silently do nothing on
-# top of it. Calico goes in instead, in networking.tf, right after this.
 resource "kind_cluster" "this" {
-  name       = var.cluster_name
-  node_image = var.node_image
-  # false, not true: disable_default_cni below means nodes have no pod
-  # network at all until networking.tf's Calico install runs afterward, so
-  # they can never report Ready during cluster creation itself - waiting
-  # here would just block forever (or until some provider-internal
-  # timeout). Actual readiness is handled downstream by
-  # time_sleep.wait_for_calico once Calico is actually in place.
+  name            = var.cluster_name
+  node_image      = var.node_image
   wait_for_ready  = false
   kubeconfig_path = local.kubeconfig_path
 
@@ -29,14 +17,6 @@ resource "kind_cluster" "this" {
     node {
       role = "control-plane"
 
-      # kind's node config has no first-class "labels" field - a
-      # kubeadm InitConfiguration patch setting kubeletExtraArgs is the
-      # documented way to label a node at join time. ingress-ready=true is
-      # what ingress-nginx's nodeSelector (addons.tf) schedules onto, and
-      # the matching toleration lets it sit on the control-plane node
-      # despite the default NoSchedule taint - the same trade its real AKS
-      # nodes never have to make, since there ingress-nginx just gets its
-      # own worker-pool capacity.
       kubeadm_config_patches = [
         "kind: InitConfiguration\nnodeRegistration:\n  kubeletExtraArgs:\n    node-labels: \"ingress-ready=true\"\n"
       ]

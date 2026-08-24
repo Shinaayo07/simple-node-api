@@ -1,9 +1,3 @@
-# SingleBinary deployment mode, plain filesystem storage - no minio, no
-# distributed read/write/backend/ingester/compactor/etc. components, no
-# bundled memcached caches. Verified via `helm template`: renders to exactly
-# one StatefulSet (1 replica), RBAC, and 3 Services. That's the whole
-# footprint - this is about as light as Loki gets while still being real
-# Loki (not promtail-to-nowhere).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -52,23 +46,14 @@ spec:
             enabled: true
             size: 10Gi
 
-        # No object storage backend running in-cluster - filesystem storage
-        # above needs it disabled explicitly, else the chart defaults to
-        # deploying it as one more component to run and maintain.
         minio:
           enabled: false
 
-        # Bundled memcached caches for chunks/query-result caching - real
-        # perf win at scale, unnecessary weight (2 more StatefulSets) for
-        # one small app's log volume.
         chunksCache:
           enabled: false
         resultsCache:
           enabled: false
 
-        # Zero out every deployment-mode component that isn't SingleBinary -
-        # otherwise some render with default replica counts regardless of
-        # deploymentMode.
         backend:
           replicas: 0
         read:

@@ -1,10 +1,3 @@
-// Simple in-memory data store.
-//
-// This exists to keep the app self-contained for the assessment (no DB setup
-// required to run it). In a real production app, this module would be swapped
-// for a real database client (Postgres/Mongo/etc.) behind the same function
-// signatures, so routes wouldn't need to change.
-
 let products;
 let customers;
 let orders;
@@ -30,7 +23,6 @@ function seed() {
   nextOrderId = 1;
 }
 
-// Initialize on first load
 seed();
 
 module.exports = {
@@ -85,7 +77,5 @@ module.exports = {
     },
     delete: (id) => orders.delete(id),
   },
-  // Used by tests to reset state between test files/suites so tests don't
-  // leak data into one another.
   reset: seed,
 };

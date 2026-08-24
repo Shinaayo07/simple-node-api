@@ -1,10 +1,3 @@
-# App-of-apps for the monitoring stack specifically. Manages everything
-# under argocd/monitoring/ - its AppProject plus the 5 component
-# Applications (prometheus, loki, tempo, alloy, grafana). Lets you bootstrap
-# or reason about the monitoring stack as one unit, separate from
-# customer-api, while still being picked up and created automatically by
-# argocd-root-app.yaml (it lives directly under argocd/, at the same level
-# as customer-api's application.yaml/appproject.yaml).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -15,9 +8,6 @@ metadata:
   finalizers:
     - resources-finalizer.argocd.argoproj.io/foreground
 spec:
-  # Same reasoning as the root Application: this creates an AppProject and
-  # Application objects themselves, which is broader than the "monitoring"
-  # AppProject it's about to create is itself scoped to allow.
   project: default
 
   source:
@@ -34,10 +24,6 @@ spec:
   syncPolicy:
     automated:
       selfHeal: true
-      # Same call as the root app: no prune here. Deleting a file under
-      # argocd/monitoring/ by accident should surface as "out of sync", not
-      # silently cascade into deleting a running StatefulSet and its PVC.
-      # The 5 leaf Applications still prune their own owned resources.
     syncOptions:
       - CreateNamespace=false
     retry:

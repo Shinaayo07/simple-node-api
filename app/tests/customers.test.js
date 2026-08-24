@@ -74,7 +74,7 @@ describe('PATCH /api/customers/:id', () => {
     const res = await request(app).patch('/api/customers/1').send({ name: 'Ada Updated' });
     expect(res.statusCode).toBe(200);
     expect(res.body.name).toBe('Ada Updated');
-    expect(res.body.email).toBe('ada@example.com'); // unchanged
+    expect(res.body.email).toBe('ada@example.com');
   });
 });
 

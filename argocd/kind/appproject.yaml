@@ -1,10 +1,3 @@
-# Kind-only mirror of ../appproject.yaml. A SEPARATE AppProject, not a
-# reuse of the AKS one, even though the whitelists are identical - this
-# ArgoCD instance lives entirely inside the local kind cluster (installed by
-# terraform/kind, not the one on AKS), so there's no shared state to
-# collide with. Kept as its own file rather than pointed at the AKS one so
-# the two environments' app-trees stay fully independent: editing this file
-# can never affect what's deployed to AKS, and vice versa.
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:

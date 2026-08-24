@@ -1,0 +1,96 @@
+name: helm-publish
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'helm/**'
+      - '.github/workflows/helm-publish.yaml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: helm-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DOCKERHUB_NAMESPACE: shina371
+  CHART_PATH: helm/customer-api
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    concurrency:
+      group: k8s-release-writer
+      cancel-in-progress: false
+    steps:
+      - name: Checkout k8s-release
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: k8s-release
+          fetch-depth: 0
+
+      - name: Set up Helm
+        uses: Azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+
+      - name: Determine chart version
+        id: version
+        run: |
+          git fetch origin main
+          chart_file="${CHART_PATH}/Chart.yaml"
+
+          current_version=$(git show origin/main:"$chart_file" | yq '.version' -)
+          previous_version=$(git show origin/main^:"$chart_file" 2>/dev/null | yq '.version' - || echo "")
+
+          if [ "$current_version" != "$previous_version" ]; then
+            echo "Chart.yaml version already bumped on main ($previous_version -> $current_version) - using it as-is."
+            new_version="$current_version"
+            echo "bumped=false" >> "$GITHUB_OUTPUT"
+          else
+            IFS='.' read -r major minor patch <<< "$current_version"
+            new_version="${major}.${minor}.$((patch + 1))"
+            echo "Auto-bumping chart version: $current_version -> $new_version"
+            echo "bumped=true" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "chart_version=${new_version}" >> "$GITHUB_OUTPUT"
+
+      - name: Sync helm/customer-api from main
+        run: |
+          git checkout origin/main -- "$CHART_PATH"
+          yq -i ".version = \"${{ steps.version.outputs.chart_version }}\"" "${CHART_PATH}/Chart.yaml"
+
+      - name: Package chart
+        run: helm package "$CHART_PATH" --destination /tmp/chart-out
+
+      - name: Log in to Docker Hub (OCI)
+        run: |
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | helm registry login registry-1.docker.io \
+            --username "${{ secrets.DOCKERHUB_USERNAME }}" \
+            --password-stdin
+
+      - name: Push chart to Docker Hub
+        run: |
+          helm push "/tmp/chart-out/customer-api-${{ steps.version.outputs.chart_version }}.tgz" \
+            "oci://registry-1.docker.io/${{ env.DOCKERHUB_NAMESPACE }}"
+
+      - name: Commit and push to k8s-release
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add "$CHART_PATH"
+
+          if git diff --cached --quiet; then
+            echo "No change to commit"
+            exit 0
+          fi
+
+          git commit -m "chore(helm): sync customer-api chart to ${{ steps.version.outputs.chart_version }}"
+          git push origin HEAD:k8s-release

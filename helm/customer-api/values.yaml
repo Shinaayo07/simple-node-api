@@ -49,8 +49,8 @@ config:
 ingress:
   enabled: true
   className: nginx
-  clusterIssuer: letsencrypt-prod # placeholder - name of the cluster's ClusterIssuer
-  host: customer-api.example.com # placeholder - replace with the real domain
+  clusterIssuer: letsencrypt-prod
+  host: customer-api.example.com
   tlsSecretName: customer-api-tls
 autoscaling:
   enabled: true
@@ -91,14 +91,11 @@ dashboard:
   enabled: true
 externalSecrets:
   enabled: true
-  # azurekv (default, AKS) or fake (local/kind - ESO's own built-in test
-  # provider, so the ExternalSecret -> SecretStore path is exercised for
-  # real instead of being disabled when there's no Key Vault to talk to).
   provider: azurekv
   workloadIdentity:
     clientId: "REPLACE_WITH_UAMI_CLIENT_ID"
     tenantId: "REPLACE_WITH_AZURE_TENANT_ID"
   keyVaultUrl: "https://REPLACE_WITH_KEY_VAULT_NAME.vault.azure.net"
   refreshInterval: 1h
-  remoteKey: customer-api-demo-key # placeholder - doesn't exist in Key Vault yet
-  fakeValue: "local-dev-demo-value" # only read when provider: fake
+  remoteKey: customer-api-demo-key
+  fakeValue: "local-dev-demo-value"

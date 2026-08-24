@@ -1,18 +1,3 @@
-# Bootstrap step, once, outside GitOps (deliberately - see appproject.yaml):
-#   helm install prometheus-operator-crds prometheus-community/prometheus-operator-crds
-# This Application skips CRDs entirely (helm.skipCrds) so it can never prune
-# them.
-#
-# Everything EXCEPT what's needed to run one Prometheus instance is disabled:
-# no bundled Grafana (we run our own, see grafana.yaml), no Alertmanager, no
-# node-exporter/kube-state-metrics/kubeEtcd/kubeControllerManager/
-# kubeScheduler/kubeProxy/coreDns (cluster-wide infra metrics, not needed to
-# cover customer-api - and the last five would render Service objects in
-# kube-system, which the monitoring AppProject's destinations deliberately
-# don't include), no default alerting rules. What's left: the Operator
-# deployment + one Prometheus pod. Verified via `helm template` - renders to
-# a Deployment (operator), a Prometheus CR (1 replica), RBAC, and the
-# operator's own webhook config - nothing else.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -43,10 +28,6 @@ spec:
           enabled: false
         defaultRules:
           create: false
-        # These default to true and render standalone Service objects in
-        # kube-system (to scrape each control-plane component) - not just
-        # unneeded for customer-api, but disallowed outright: the monitoring
-        # AppProject's destinations only permit the monitoring namespace.
         kubeEtcd:
           enabled: false
         kubeControllerManager:
@@ -78,11 +59,6 @@ spec:
               limits:
                 cpu: 500m
                 memory: 512Mi
-            # nil-selector-uses-helm-values: false + no explicit selector set
-            # below means "match ServiceMonitors/PodMonitors in every
-            # namespace, no label filter" - so customer-api's ServiceMonitor
-            # (in a different namespace, with no special label) gets picked
-            # up automatically, with nothing further to wire on either side.
             serviceMonitorSelectorNilUsesHelmValues: false
             podMonitorSelectorNilUsesHelmValues: false
             serviceMonitorNamespaceSelector: {}

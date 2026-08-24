@@ -168,11 +168,20 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: write
+    concurrency:
+      group: k8s-release-writer
+      cancel-in-progress: false
     steps:
-      - name: Checkout code
+      - name: Checkout k8s-release
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
+          ref: k8s-release
+          fetch-depth: 0
+
+      - name: Sync helm/customer-api from main
+        run: |
+          git fetch origin main
+          git checkout origin/main -- helm/customer-api
 
       - name: Update image digest in Helm values
         env:
@@ -184,18 +193,18 @@ jobs:
             yq -i ".image.tag = \"${short_sha}\" | .image.digest = \"${DIGEST}\"" "$f"
           done
 
-      - name: Commit and push
+      - name: Commit and push to k8s-release
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          git add helm/customer-api/values.yaml helm/customer-api/values-kind.yaml
+          git add helm/customer-api
 
           if git diff --cached --quiet; then
-            echo "No image change to commit"
+            echo "No change to commit"
             exit 0
           fi
 
           short_sha="${GITHUB_SHA:0:7}"
           git commit -m "chore(gitops): bump customer-api image to ${short_sha}"
-          git push origin HEAD:main
+          git push origin HEAD:k8s-release

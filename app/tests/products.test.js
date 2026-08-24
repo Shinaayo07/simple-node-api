@@ -90,7 +90,7 @@ describe('PATCH /api/products/:id', () => {
     const res = await request(app).patch('/api/products/1').send({ price: 15 });
     expect(res.statusCode).toBe(200);
     expect(res.body.price).toBe(15);
-    expect(res.body.name).toBe('Sample Widget'); // unchanged
+    expect(res.body.name).toBe('Sample Widget');
   });
 
   test('returns 404 for unknown id', async () => {

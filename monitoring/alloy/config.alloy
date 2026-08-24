@@ -1,11 +1,7 @@
-// Discovers every container on the local Docker daemon so we can tail their
-// stdout/stderr logs and ship them to Loki.
 discovery.docker "containers" {
   host = "unix:///var/run/docker.sock"
 }
 
-// Docker container names are reported with a leading slash (e.g. "/tempo");
-// strip it so the "container" label in Loki reads "tempo", not "/tempo".
 discovery.relabel "containers" {
   targets = discovery.docker.containers.targets
 

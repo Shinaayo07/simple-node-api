@@ -1,0 +1,50 @@
+name: iac-CI
+
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'terraform/**'
+      - 'helm/**'
+      - '.github/workflows/iac-CI.yaml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'terraform/**'
+      - 'helm/**'
+      - '.github/workflows/iac-CI.yaml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iac-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checkov:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Checkov - Terraform
+        uses: bridgecrewio/checkov-action@59b9d7edfcad5b87fbe3f473a9a134a721ad03f8 # v12.3119.0
+        with:
+          directory: terraform
+          framework: terraform
+          output_format: cli
+          soft_fail: true
+
+      - name: Checkov - Helm
+        uses: bridgecrewio/checkov-action@59b9d7edfcad5b87fbe3f473a9a134a721ad03f8 # v12.3119.0
+        with:
+          directory: helm
+          framework: helm
+          output_format: cli
+          soft_fail: true

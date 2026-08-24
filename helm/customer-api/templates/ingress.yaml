@@ -15,7 +15,7 @@ spec:
   tls:
     - hosts:
         - {{ .Values.ingress.host }}
-      secretName: {{ .Values.ingress.tlsSecretName }} # populated by cert-manager, not committed to git
+      secretName: {{ .Values.ingress.tlsSecretName }}
   rules:
     - host: {{ .Values.ingress.host }}
       http:

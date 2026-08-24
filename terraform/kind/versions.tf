@@ -23,10 +23,4 @@ terraform {
       version = "~> 0.12"
     }
   }
-
-  # No remote backend, deliberately - unlike terraform/cluster's Azure
-  # storage backend. This state describes a cluster that only exists on
-  # the machine that created it; there's nothing to share it with, and
-  # `terraform destroy` here is a normal, frequent operation (not the rare,
-  # careful one it is for AKS).
 }

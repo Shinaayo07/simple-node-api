@@ -12,7 +12,7 @@ describe('POST /api/orders', () => {
   test('creates an order and computes the total from product prices', async () => {
     const res = await request(app)
       .post('/api/orders')
-      .send({ customerId: '1', items: [{ productId: '1', quantity: 2 }] }); // 2 x 9.99
+      .send({ customerId: '1', items: [{ productId: '1', quantity: 2 }] });
     expect(res.statusCode).toBe(201);
     expect(res.body.status).toBe('pending');
     expect(res.body.total).toBe(19.98);

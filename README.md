@@ -1,153 +1,98 @@
 # simple-node-api
 
-This application is for the practical assessment interview at Prembly.
+`customer-api` is a small Express REST API (products/customers/orders, in-memory store) built for the Prembly DevOps practical assessment. It ships with Prometheus metrics, OpenTelemetry tracing, and structured logging, and is deployed identically to two environments — **AKS** (real cloud) and **kind** (local mirror) — via one Docker image, one Helm chart, and ArgoCD.
 
-`customer-api` (in `app/`) is a small Express REST API with Prometheus metrics,
-OpenTelemetry tracing, and structured logging. It's built and deployed the same
-way regardless of where it runs - one Docker image
-(`docker.io/shina371/simple-node-api`, built/pushed/signed by
-`.github/workflows/application-CI.yaml`) and one Helm chart
-(`helm/customer-api`), deployed via ArgoCD. The same workflow closes the
-GitOps loop end to end: after a build is pushed and signed, its
-`update-gitops-manifests` job commits the new image digest into
-`helm/customer-api/values.yaml`/`values-kind.yaml` on `main`, which is the
-change ArgoCD's `automated`/`selfHeal` sync actually reacts to - no manual
-tag bumping. Two environments are covered:
+## Architecture
 
-- **AKS** (`terraform/`, `argocd/`, `helm/customer-api/values.yaml`) - the real
-  cloud deployment. Azure CNI network policy, Azure AD RBAC, workload-identity
-  federated External Secrets against Key Vault, cert-manager against
-  Let's Encrypt.
-- **kind** (`terraform/kind/`, `argocd/kind/`, `helm/customer-api/values-kind.yaml`) -
-  a local mirror of the same architecture, runnable on your own machine. Same
-  chart, same ArgoCD app-of-apps pattern, same NetworkPolicy/ingress/
-  cert-manager/External-Secrets shape - just Calico instead of Azure CNI,
-  ingress-nginx's hostPort instead of a cloud load balancer, a self-signed
-  ClusterIssuer instead of Let's Encrypt, and ESO's own `fake` provider
-  instead of Key Vault.
+- **App** (`app/`): Express + Helmet, `/health` (liveness) and `/ready` (readiness), `/metrics` (Prometheus), OpenTelemetry auto-instrumentation, pino logs.
+- **CI** (`.github/workflows/application-CI.yaml`): lint/test/audit → Semgrep/TruffleHog/Trivy scans → build → sign (cosign, Azure Key Vault) → push to Docker Hub (`docker.io/shina371/simple-node-api`).
+- **Delivery split across two branches**, to keep bot commits and human commits from ever colliding:
+  - `main` — where developers work: app source, Helm chart source, Terraform, ArgoCD manifests.
+  - `k8s-release` — bot-only. CI writes the current image digest and chart version here after every relevant build; **ArgoCD watches this branch, never `main`**.
+- **Helm chart** (`helm/customer-api/`): one chart, two value overlays (`values.yaml` for AKS, `values-kind.yaml` layered on top for kind). Also published as a versioned OCI artifact (`oci://registry-1.docker.io/shina371/customer-api`) via `.github/workflows/helm-publish.yaml`, independent of ArgoCD, for anyone who wants to `helm install` it directly.
+- **GitOps** (`argocd/`): app-of-apps pattern. One root `Application` per environment (`argocd-root-app.yaml` / `argocd-root-app-kind.yaml`) applied by hand once; everything else — customer-api's own `Application`, and the optional Prometheus/Loki/Tempo/Grafana/Alloy stack — syncs itself from git from then on.
+- **Infra** (`terraform/`): `bootstrap/` (remote state storage), `cluster/` (AKS + network), `kind/` (full local platform: kind cluster, Calico, ingress-nginx, cert-manager, External Secrets, Prometheus Operator CRDs, and ArgoCD itself).
+- **IaC scanning** (`.github/workflows/iac-CI.yaml`): Checkov against `terraform/` and `helm/` on every relevant change, currently soft-fail while the initial findings backlog is triaged.
 
-This README covers running the **kind** setup end to end.
+## How to run the application
 
-## Prerequisites
+### Locally (kind)
 
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or another
-  Docker Engine) - **running**, with at least 6 CPUs / 10-12GB RAM allocated if
-  you plan to also run the observability stack (see "Optional: also deploy
-  monitoring" below). Without it, ~3-4GB is enough for the app alone.
-- [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation)
-- [Terraform](https://developer.hashicorp.com/terraform/install) >= 1.9
-- `kubectl`
-- (optional, only to run `helm template`/`helm lint` yourself) `helm`
-
-## 1. Stand up the platform
-
-Terraform owns everything infrastructure-level: the kind cluster, Calico (so
-NetworkPolicy is actually enforced), metrics-server, ingress-nginx,
-cert-manager + a local self-signed ClusterIssuer, External Secrets Operator,
-the Prometheus Operator CRDs, and ArgoCD itself. It does **not** deploy the
-application - that's the next step.
-
-Docker must be running before this - `kind` creates the cluster's nodes as
-Docker containers, so `terraform apply` fails immediately (erroring on the
-Docker socket) if the Docker Engine/Docker Desktop isn't up yet.
+Prerequisites: Docker running, [kind](https://kind.sigs.k8s.io/), Terraform ≥ 1.9, `kubectl`.
 
 ```bash
 cd terraform/kind
 terraform init
-terraform apply -auto-approve
+terraform apply -auto-approve   # provisions the cluster + platform (Calico, ingress-nginx, cert-manager, ESO, ArgoCD)
 ```
 
-This takes a few minutes (pulling several Helm charts). When it finishes, the
-`next_steps` output repeats the commands below.
-
-## 2. Deploy the application
-
-This is the one manual step, deliberately - it mirrors exactly how the AKS
-side works (`argocd-root-app.yaml` is "the one manifest you apply by hand,
-ever" there too). ArgoCD takes over from here, syncing from this repo's `main`
-branch on its own.
-
-From the repo root (`cd ../..` if you're still inside `terraform/kind`):
+**On a genuinely first-ever apply (no `.kubeconfig` yet in this directory), run `terraform apply -auto-approve` a second time.** This isn't a flaky failure — Terraform configures the `kubectl`/`helm` providers *before* `kind_cluster.this` has a chance to write the kubeconfig they need, so the first pass reliably fails on the Calico/ingress-nginx/etc. resources with a `dial tcp` or `http://localhost/api` style error. The cluster itself is fine at that point; a second apply picks up the now-valid kubeconfig and finishes the rest. Also expect the first apply to take a while (10–20+ minutes) pulling several Helm charts' images for the first time — that's normal, not a hang.
 
 ```bash
-export KUBECONFIG=terraform/kind/.kubeconfig
-
-# App only:
-kubectl apply -f argocd-root-app-kind.yaml
-
-# App + observability stack (Prometheus, Loki, Tempo, Grafana, Alloy):
-kubectl apply -f argocd-root-app-kind.yaml -f argocd/monitoring-apps.yaml
+export KUBECONFIG=$(pwd)/.kubeconfig
+kubectl apply -f ../../argocd-root-app-kind.yaml
+kubectl get applications -n argocd -w   # wait for customer-api to reach Synced/Healthy
 ```
-
-Watch it sync:
-
-```bash
-kubectl get applications -n argocd -w
-```
-
-customer-api should reach `Synced`/`Healthy` within a minute or two. If you
-applied the monitoring stack too, give it a bit longer - `prometheus`,
-`loki`, `tempo`, `grafana`, and `alloy` each sync independently.
-
-## 3. Reach the app
-
-```
-https://customer-api.127.0.0.1.nip.io
-```
-
-(`nip.io` resolves that hostname to `127.0.0.1` via public DNS, so this works
-with no `/etc/hosts` editing - it just needs to resolve, your traffic never
-leaves your machine.) Your browser will warn about the certificate - it's
-issued by the local self-signed ClusterIssuer, not a real CA, since there's no
-public domain for Let's Encrypt to validate against locally. Accept it to
-proceed. Try:
 
 ```bash
 curl -k https://customer-api.127.0.0.1.nip.io/health
 curl -k https://customer-api.127.0.0.1.nip.io/api/products
 ```
 
-## 4. Reach ArgoCD, Grafana, and Prometheus
+Tear down with `terraform destroy -auto-approve` from `terraform/kind`. If it fails partway with `failed to delete release: prometheus-operator-crds` (Helm can get stuck uninstalling CRDs that still have live instances), run `terraform state rm helm_release.prometheus_operator_crds` and destroy again — safe here since the very next resource it destroys is the kind cluster itself, deleting the underlying Docker containers wholesale regardless of that release's state.
 
-None of these have a local Ingress (deliberately - `argocd/monitoring/*.yaml`
-is shared verbatim with the AKS deployment, so it isn't kind-specific). Reach
-them the same way you'd reach any internal-only service: `kubectl
-port-forward`.
+### Cloud (Azure/AKS)
 
 ```bash
-# ArgoCD UI - https://localhost:8080, user "admin"
-kubectl port-forward -n argocd svc/argocd-server 8080:443
-kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d
+cd terraform/bootstrap
+terraform init && terraform apply -auto-approve   # remote state storage account
 
-# Grafana - http://localhost:3000 (anonymous admin access, same as docker-compose)
-kubectl port-forward -n monitoring svc/grafana 3000:80
+cd ../cluster
+cp backend.hcl.example backend.hcl   # fill in from bootstrap's output
+terraform init -backend-config=backend.hcl
+cp terraform.tfvars.example terraform.tfvars   # set authorized_ip_ranges to your own IP
+terraform apply -auto-approve
 
-# Prometheus - http://localhost:9090
-kubectl port-forward -n monitoring svc/prometheus-prometheus 9090:9090
+az aks get-credentials --resource-group <resource_group_name output> --name <cluster_name output>
 ```
 
-Grafana already has Prometheus/Loki/Tempo wired up as datasources (see
-`argocd/monitoring/grafana.yaml`), including trace-to-logs and
-exemplar-to-trace links - metrics, logs, and traces for customer-api are all
-one click apart from each other.
-
-## Tearing down
+At this point the AKS cluster exists, but **ArgoCD isn't installed yet** — see Assumptions below. Once ArgoCD is running in the cluster, apply the root app the same way as kind:
 
 ```bash
-cd terraform/kind
-terraform destroy -auto-approve
+kubectl apply -f argocd-root-app.yaml
 ```
 
-This deletes the kind cluster (and everything in it) along with the local
-`.kubeconfig` file it wrote.
+## How to deploy it
 
-## Known trade-offs of the local mirror
+Deployment is push-triggered, not manual:
 
-- **GitOps needs git**: ArgoCD syncs from your real GitHub repo, not your
-  working tree. A local edit needs a commit + push to `main` before it shows
-  up in-cluster - same as it would on AKS.
-- **Resource footprint**: the full stack (platform + app + monitoring) wants
-  roughly 6+ CPUs and 10-12GB RAM given to Docker Desktop. Skip the
-  `argocd/monitoring-apps.yaml` apply in step 2, or set `worker_count = 0` in
-  `terraform/kind` (see `terraform.tfvars.example`), if your machine is
-  tighter than that.
+1. Push to `main` (app change, chart change, or both).
+2. `application-CI.yaml` builds, scans, signs, and pushes the image, then bumps the digest onto `k8s-release`. `helm-publish.yaml` bumps the chart version, publishes it to Docker Hub as an OCI artifact, and syncs the chart onto `k8s-release`.
+3. ArgoCD (`automated: { prune: true, selfHeal: true }`) picks up the change on `k8s-release` on its own — no manual `argocd app sync` needed.
+
+## How to rollback
+
+`k8s-release` is what ArgoCD actually deploys from, so a rollback is a normal git operation there — revert the offending commit on `k8s-release` and push; ArgoCD's `selfHeal` re-syncs to the reverted state automatically. Equivalently, `argocd app rollback customer-api <REVISION_ID>` against one of the last 5 tracked revisions (`revisionHistoryLimit: 5`) works without touching git at all. Because the image is digest-pinned (not a floating tag), a rollback is always to an exact, previously-verified build — never an ambiguous "whatever `latest` happened to be."
+
+## How to monitor it
+
+Prometheus scrapes customer-api via its `ServiceMonitor` (`/metrics`, 15s interval). A Grafana dashboard ships with the chart itself (`helm/customer-api/templates/grafana-dashboard-configmap.yaml`, auto-discovered by Grafana's sidecar) covering the four signals this assessment asks for:
+
+| Signal | Metric |
+|---|---|
+| Availability | `up{job="customer-api"}` |
+| HTTP errors | `rate(http_requests_total{status_code=~"5.."}[5m])` ratio |
+| CPU / memory | `container_cpu_usage_seconds_total` / `container_memory_working_set_bytes` per pod |
+| Latency | `histogram_quantile` p50/p95/p99 on `http_request_duration_seconds` |
+
+Suggested alert thresholds are documented directly in each panel's description rather than wired as `PrometheusRule` objects — visualization only, by design, for now. Reach Grafana/Prometheus/ArgoCD via `kubectl port-forward` (no public ingress for platform tools, deliberately — see `argocd/monitoring/`).
+
+## Important assumptions made
+
+- **AKS's platform layer isn't automated yet.** `terraform/cluster` provisions the AKS cluster and network only — unlike `terraform/kind`, it does not install ArgoCD, ingress-nginx, cert-manager, or External Secrets. Those need a manual bootstrap on AKS today.
+- **No real domain/Key Vault yet.** `values.yaml`'s ingress host, Let's Encrypt issuer, and Azure Key Vault fields are placeholders (`REPLACE_WITH_...`) pending a real AKS deployment.
+- **`k8s-release` is created once, manually, from `main`**, before the first deploy — it isn't self-bootstrapping.
+- **No real secret exists yet.** The `ExternalSecret`/`SecretStore` wiring is fully functional but demo-only (`fake` provider on kind, an empty Key Vault entry on AKS) — there's no actual application secret to sync yet.
+- **In-memory store only** — customer-api has no real database; state doesn't persist across restarts, intentionally, for the scope of this assessment.
+- **Post-deploy pipeline health check deliberately deferred** — no live AKS cluster exists yet to verify against.
+- **Checkov runs soft-fail initially** in `iac-CI.yaml`, pending triage of the first findings pass across `terraform/` and `helm/`.

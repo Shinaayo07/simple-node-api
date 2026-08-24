@@ -21,9 +21,6 @@ storage:
     local:
       path: /var/tempo/blocks
 
-# Derives RED metrics (span-metrics) and a service topology map (service-graphs)
-# from the spans Tempo ingests, and remote-writes them into Prometheus - so
-# metrics can jump to the trace that produced them (exemplars) and vice versa.
 metrics_generator:
   registry:
     external_labels:

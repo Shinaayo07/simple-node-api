@@ -1,8 +1,3 @@
-# Kind-only mirror of ../application.yaml. Same chart, same repo, same
-# path - the only difference from the AKS Application is the extra
-# valueFiles entry layering values-kind.yaml over values.yaml (local image
-# tag, fake ESO provider, self-signed ingress). One Helm package, two sets
-# of environment inputs.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -17,7 +12,7 @@ spec:
 
   source:
     repoURL: https://github.com/Shinaayo07/simple-node-api.git
-    targetRevision: main
+    targetRevision: k8s-release
     path: helm/customer-api
     helm:
       releaseName: customer-api
