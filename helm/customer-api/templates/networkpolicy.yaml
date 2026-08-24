@@ -78,10 +78,6 @@ spec:
   policyTypes:
     - Egress
   egress:
-    # Placeholder values (networkPolicy.tempo.*): matches the labels the
-    # eventual monitoring Helm release gives its Tempo pod/namespace. Until
-    # that chart is deployed with matching labels, trace export fails
-    # closed (blocked), not open.
     - to:
         - namespaceSelector:
             matchLabels:

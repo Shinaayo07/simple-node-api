@@ -1,16 +1,4 @@
 {{- if .Values.dashboard.enabled }}
-# Auto-discovered by Grafana's dashboard sidecar (argocd/monitoring/grafana.yaml
-# enables sidecar.dashboards.enabled + searchNamespace: ALL) - no manual import
-# step, and no coupling to the platform's own Grafana Application. Same "app
-# owns its own observability config" pattern as servicemonitor.yaml above:
-# this dashboard ships and versions with the app, not the monitoring stack.
-#
-# Covers the four signals customer-api is asked to demonstrate monitoring
-# for: availability (up), HTTP errors (http_requests_total), CPU/memory
-# (container_cpu_usage_seconds_total / container_memory_working_set_bytes),
-# and request latency (http_request_duration_seconds histogram quantiles).
-# Alerting thresholds are documented as panel annotations/description text
-# rather than PrometheusRule - visualization only, by design.
 apiVersion: v1
 kind: ConfigMap
 metadata:
