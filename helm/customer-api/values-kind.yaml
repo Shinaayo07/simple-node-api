@@ -1,8 +1,8 @@
 image:
   registry: docker.io
   repository: shina371/simple-node-api
-  tag: "bce8a41"
-  digest: "sha256:de1b6c1dda48bc343a8d769661c87f7188bd659ddfbf033ea462d6d895ad5afc"
+  tag: "1f904d2"
+  digest: "sha256:e120de2787edfc096c5484055cc20f37e6a2c76aaa0d8ec8a2d81a0949c9d709"
 externalSecrets:
   enabled: true
   provider: fake
