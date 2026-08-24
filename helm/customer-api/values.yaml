@@ -87,6 +87,8 @@ networkPolicy:
 serviceMonitor:
   enabled: true
   interval: 15s
+dashboard:
+  enabled: true
 externalSecrets:
   enabled: true
   # azurekv (default, AKS) or fake (local/kind - ESO's own built-in test

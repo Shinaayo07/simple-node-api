@@ -34,6 +34,18 @@ spec:
           enabled: true
           size: 2Gi
 
+        # Auto-discovers dashboards from ConfigMaps labeled grafana_dashboard:
+        # "1" anywhere in the cluster (searchNamespace: ALL) - e.g.
+        # customer-api's own dashboard, which ships from
+        # helm/customer-api/templates/grafana-dashboard-configmap.yaml rather
+        # than being provisioned here. Keeps app-specific dashboards owned by
+        # the app's own chart, same separation as ServiceMonitors already
+        # living there instead of in this platform-level Application.
+        sidecar:
+          dashboards:
+            enabled: true
+            searchNamespace: ALL
+
         # Anonymous admin access, same call made for the docker-compose
         # stack - fine for a demo/interview cluster with nothing sensitive
         # behind it; swap for real auth (OIDC/SSO) before this is anything
