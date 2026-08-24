@@ -27,6 +27,13 @@ spec:
     chart: alloy
     targetRevision: "1.11.1"
     helm:
+      # The chart unconditionally bundles a PodLogs CRD (crds/ directory,
+      # for its Operator-mode CRD-driven config) - unused here (config below
+      # is plain flow-mode via a ConfigMap, no PodLogs/GrafanaAgent custom
+      # resources), and a cluster-scoped CRD isn't in the monitoring
+      # AppProject's clusterResourceWhitelist anyway. Same skipCrds
+      # reasoning as prometheus.yaml.
+      skipCrds: true
       values: |
         controller:
           type: deployment
