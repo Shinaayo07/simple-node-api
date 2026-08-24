@@ -187,10 +187,9 @@ jobs:
         env:
           DIGEST: ${{ needs.build-and-scan-image.outputs.image_digest }}
         run: |
-          short_sha="${GITHUB_SHA:0:7}"
-
+          # Must match the tag actually pushed to Docker Hub (full github.sha, see build-and-scan-image).
           for f in helm/customer-api/values.yaml helm/customer-api/values-kind.yaml; do
-            yq -i ".image.tag = \"${short_sha}\" | .image.digest = \"${DIGEST}\"" "$f"
+            yq -i ".image.tag = \"${GITHUB_SHA}\" | .image.digest = \"${DIGEST}\"" "$f"
           done
 
       - name: Commit and push to k8s-release

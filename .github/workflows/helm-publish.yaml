@@ -45,17 +45,20 @@ jobs:
           git fetch origin main
           chart_file="${CHART_PATH}/Chart.yaml"
 
-          current_version=$(git show origin/main:"$chart_file" | yq '.version' -)
-          previous_version=$(git show origin/main^:"$chart_file" 2>/dev/null | yq '.version' - || echo "")
+          main_version=$(git show origin/main:"$chart_file" | yq '.version' -)
+          # Compare against the version last actually published (persisted on k8s-release),
+          # not main's commit history - two helm-only commits on main with no manual version
+          # bump in between must not both compute the same "next" version and collide on push.
+          released_version=$(yq '.version' "$chart_file")
 
-          if [ "$current_version" != "$previous_version" ]; then
-            echo "Chart.yaml version already bumped on main ($previous_version -> $current_version) - using it as-is."
-            new_version="$current_version"
+          if [ "$main_version" != "$released_version" ]; then
+            echo "Chart.yaml version bumped on main ($released_version -> $main_version) - using it as-is."
+            new_version="$main_version"
             echo "bumped=false" >> "$GITHUB_OUTPUT"
           else
-            IFS='.' read -r major minor patch <<< "$current_version"
+            IFS='.' read -r major minor patch <<< "$released_version"
             new_version="${major}.${minor}.$((patch + 1))"
-            echo "Auto-bumping chart version: $current_version -> $new_version"
+            echo "Auto-bumping chart version: $released_version -> $new_version"
             echo "bumped=true" >> "$GITHUB_OUTPUT"
           fi
 
