@@ -135,15 +135,18 @@ jobs:
       - name: Log in to Docker Hub
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
-         username: ${{ secrets.DOCKERHUB_USERNAME }}
-         password: ${{ secrets.DOCKERHUB_TOKEN }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Push Docker Image to Docker Hub
         id: push-step
         run: |
-          docker push docker.io/${{ env.DOCKERHUB_NAMESPACE }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-
-          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' docker.io/${{ env.DOCKERHUB_NAMESPACE }}/${{ env.IMAGE_NAME }}:${{ github.sha }} | cut -d'@' -f2)
+          # Capture stdout from push
+          PUSH_OUTPUT=$(docker push docker.io/${{ env.DOCKERHUB_NAMESPACE }}/${{ env.IMAGE_NAME }}:${{ github.sha }})
+          
+          # Extract actual sha256 registry digest output directly
+          DIGEST=$(echo "$PUSH_OUTPUT" | grep -o 'sha256:[a-f0-9]\{64\}' | tail -n 1)
+          
           echo "IMAGE_DIGEST=$DIGEST" >> $GITHUB_ENV
           echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
 
@@ -157,9 +160,9 @@ jobs:
           AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
         run: |
-         cosign sign --yes \
-          --key "azurekms://${{ vars.KEY_VAULT_NAME }}.vault.azure.net/${{ vars.KEY_NAME }}" \
-          ${IMAGE}
+          cosign sign --yes \
+            --key "azurekms://${{ vars.KEY_VAULT_NAME }}.vault.azure.net/${{ vars.KEY_NAME }}" \
+            ${IMAGE}
 
   update-manifests:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -187,7 +190,6 @@ jobs:
         env:
           DIGEST: ${{ needs.build-and-scan-image.outputs.image_digest }}
         run: |
-          # Must match the tag actually pushed to Docker Hub (full github.sha, see build-and-scan-image).
           for f in helm/customer-api/values.yaml helm/customer-api/values-kind.yaml; do
             yq -i ".image.tag = \"${GITHUB_SHA}\" | .image.digest = \"${DIGEST}\"" "$f"
           done
