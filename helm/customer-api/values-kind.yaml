@@ -18,7 +18,7 @@ image:
   # build. pullPolicy is inherited from values.yaml's IfNotPresent: a digest
   # reference is immutable, so there's no "stale cached tag" problem an
   # Always pull would be working around.
-  tag: "10ec59c"
+  tag: "bce8a41"
   digest: "sha256:de1b6c1dda48bc343a8d769661c87f7188bd659ddfbf033ea462d6d895ad5afc"
 # No cloud Key Vault in kind - ESO's own "fake" provider exercises the same
 # ExternalSecret -> SecretStore -> Secret path without one. See
