@@ -2,5 +2,5 @@ apiVersion: v2
 name: customer-api
 description: Customer-facing REST API (simple-node-api) - Prembly DevOps assessment
 type: application
-version: 0.2.1
+version: 0.2.0
 appVersion: "1.0.0"
