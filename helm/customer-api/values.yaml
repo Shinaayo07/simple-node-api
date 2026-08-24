@@ -6,7 +6,7 @@ namespace:
 image:
   registry: docker.io
   repository: shina371/simple-node-api
-  tag: "66c141b7b37c649a3a473a7e1f7649a53920459c"
+  tag: "a1d79c393317b08417f4514e7acab28b9b16e141"
   digest: "sha256:e120de2787edfc096c5484055cc20f37e6a2c76aaa0d8ec8a2d81a0949c9d709"
   pullPolicy: IfNotPresent
 replicaCount: 2
